@@ -7,6 +7,11 @@
     "build": "vue-cli-service build"
   },
   "dependencies": {
+    "@fullcalendar/core": "^5.10.0",
+    "@fullcalendar/daygrid": "^5.10.0",
+    "@fullcalendar/interaction": "^5.10.0",
+    "@fullcalendar/vue": "^5.10.0",
+    "@fullcalendar/vue3": "^5.10.0",
     "vue": "^3.0.0",
     "vue-class-component": "^8.0.0-0",
     "vue-router": "^4.0.0-0",
