@@ -1,6 +1,6 @@
 <template>
   <div class="home">
-    <Calendar msg="Welcome to Your Vue.js + TypeScript App"/>
+    <Calendar/>
   </div>
 </template>
 
