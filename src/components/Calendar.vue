@@ -5,8 +5,11 @@
 
       <div class="d-flex justify-content-between mb-3">
         <button @click="prevPage" :disabled="pageNumber == 0" class="btn btn-success">Prev</button>
+        <button @click="forceRender" class="btn btn-danger">Force Render</button>
         <button @click="nextPage" :disabled="pageNumber >= pageCount()-1" class="btn btn-success">Next</button>
       </div>
+
+      <!-- CALENDAR CONTAINER -->
 
       <div class="calendar-container">
         
@@ -26,15 +29,15 @@
           </ul>
         </div>
 
-        <div class="event-container">
-          <div v-for="supereven in superevent" :key="supereven.i" class="event-slot slot-1">
-            <div class="event-status"></div>
-            <span :title="supereven.name">{{ supereven.name }}</span>
-          </div>
-          <!-- <div class="event-slot slot-1">
+        <div class="event-container" @click="realtiveCoords">
+            <div v-for="event in eventsOnaCalendar" :key="event.i" class="event-slot slot-1" :style="{ 'grid-column': event.weekDay, 'grid-row': (1 + (event.executor * 3)) }">
+              <div class="event-status" :title="event.subject">{{ event.planStartDate + event.subject }}</div>
+              <!-- <span>{{ event.subject }}</span> -->
+            </div>
+          <div class="event-slot slot-1">
             <div class="event-status"></div>
             <span>Event A</span>
-          </div> -->
+          </div>
         </div>
 
       </div>
@@ -49,8 +52,8 @@
       <input class="w-100" @input="backlogSearch" v-model="searchField" type="search" placeholder="Поиск">
       <div class="backlog-card-list">
         <div class="backlog-card card my-1 text-start" v-for="task in filteredBacklog" :key="task.i" draggable="true">
-          <div @click="addTask(task.id, task.planStartDate, task.planEndDate, task.subject, task.executor)" class="card-header color-blue fw-bold">
-            {{ task.subject }}
+          <div @click="addTask(task)" class="card-header color-blue fw-bold">
+            {{ task.subject }}  
           </div>
           <div class="card-body">
             <p>
@@ -85,7 +88,7 @@ export default class Calendar extends Vue {
       pageNumber: 0,
       listData: {
         type: Array,
-        required: false
+        required: true
       },
       size: {
         type:Number,
@@ -93,6 +96,7 @@ export default class Calendar extends Vue {
         default: 7
       },
       superevent: [],
+      eventsOnaCalendar: []
     }
   }
   superevent: any;
@@ -106,21 +110,6 @@ export default class Calendar extends Vue {
 
   pageNumber: number = 0;
   listData: any[] = [
-    // { date: "2021-10-01" },
-    // { date: "2021-10-02" },
-    // { date: "2021-10-03" },
-    // { date: "2021-10-04" },
-    // { date: "2021-10-05" },
-    // { date: "2021-10-06" },
-    // { date: "2021-10-07" },
-    // { date: "2021-10-08" },
-    // { date: "2021-10-09" },
-    // { date: "2021-10-10" },
-    // { date: "2021-10-11" },
-    // { date: "2021-10-12" },
-    // { date: "2021-10-13" },
-    // { date: "2021-10-14" },
-    // { date: "2021-10-15" },
     { date: "2021-10-16" },
     { date: "2021-10-17" },
     { date: "2021-10-18" },
@@ -146,157 +135,11 @@ export default class Calendar extends Vue {
   daysInaWeek: number = 7;
   sections: number = this.daysInaWeek;
 
-  addTask(id: string, startDate: string, endDate: string, subject: string, executor: number = 5) {
-    const event = {
-      id: id,
-      startDate: startDate,
-      endDate: endDate,
-      name: subject,
-      executor: 5
-    };
-
-    this.events = [];
-    this.events.push(event);
-    this.processEvents();
-    this.loadEvents();
-  }
-
-  processEvents() {
-    this.events.forEach(event => {
-      const cell = Number(this.getCell(event.executor));
-
-      if(!this.eventsByDay[event.startDate]) {
-        this.eventsByDay[event.startDate] = {};
-        this.eventsByDay[event.startDate][cell] = [];
-      }
-
-      if(!this.eventsByDay[event.startDate][cell]) {
-        this.eventsByDay[event.startDate][cell] = [];
-      }
-
-      this.eventsByDay[event.startDate][cell].push(event);
-    });
-  }
-
-  // sortcomparer(e1: any, e2: any) {
-  //   const t1start = timeFromString(e1.starttime);
-  //   const t1end = timeFromString(e1.endtime);
-  //   const t2start = timeFromString(e2.starttime);
-  //   const t2end = timeFromString(e2.endtime);
-
-  //   //return t1start.getTime() - t2start.getTime();
-  //   const t1 = +(t1end - t1start);
-  //   const t2 = +(t2end - t2start);
-
-  //   return t2 - t1;
-  // }
-
-  loadEvents() {
-    Object.keys(this.eventsByDay).forEach(el => {
-      const eventsForThisDay = this.eventsByDay[el];
-
-      Object.keys(eventsForThisDay).forEach(c => {
-        const events = eventsForThisDay[c];
-        
-        var totalEventsPerCell = events.length;
-        
-        var offset = 0;
-
-        for (let i = 0; i < events.length; i++) {
-          const event = events[i];
-
-          const colPos = this.getColumnPosition(event.startDate);
-          const perc = 100 / (this.sections + 1 - colPos);
-          const percW = Math.floor(perc / totalEventsPerCell);
-
-          var wMultiplier = 1.5;
-
-          if(offset === totalEventsPerCell - 1) {
-            wMultiplier = 0.95;
-          }
-
-          event["width"] = percW * wMultiplier;
-          event["left"] = percW * offset;
-          event["time"] = `${event.startDate} - ${event.endDate}`;
-          this.renderEvent(event);
-          this.superevent.push(event);
-          console.log(this.superevent);
-        }
-      });
-    });
-  }
-
-  renderEvent(event: any) {
-
-    var eventSlot = document.createElement("div");
-    var oneEvent = document.createElement("div");
-    var eventStatus = document.createElement("div");
-    var eventName = document.createElement("div");
-    var eventTime = document.createElement("div");
-
-    
-    const color = "darkslategray";
-    eventName.innerHTML = `${event.name}`;
-    eventTime.innerHTML = `${event.startDate}`;
-
-    
-    // console.log(oneEvent);
-    
-
-    // var asd = document.querySelector(".event-container");
-    // asd!.appendChild(oneEvent);
-    // oneEvent!.appendChild(eventStatus);
-    // oneEvent!.appendChild(eventName);
-    // oneEvent!.appendChild(eventTime);
-
-    // asd!.appendChild()
-    eventSlot.setAttribute("class", "event-slot");
-    eventName.setAttribute("class", "event-name");
-    eventTime.setAttribute("class", "event-name");
-    eventStatus.setAttribute("class", "event-status");
-    oneEvent.setAttribute("class", "event-slot slot-1");
-  }
-
-  getColumnPosition(startdate: string) {
-    const y = +startdate.split("-")[0];
-    const m = +startdate.split("-")[1];
-    const d = +startdate.split("-")[2];
-
-    const date = new Date(y, m - 1, d);
-    return date.getDay() + 1;
-  }
-
-  getCell(executor: number) {
-    const h = executor;
-  }
-
-
-// PAGINATION
-  nextPage() {
-    this.pageNumber++;
-  }
-
-  prevPage() {
-    this.pageNumber--;
-  }
-
-  pageCount() {
-    let length = this.listData.length;
-    let size = this.size;
-
-    return Math.ceil(length/size);
-  }
-
-  paginatedData() {
-    const start = this.pageNumber * this.size,
-    end = start + this.size;
-    return this.listData.slice(start, end);
-  }
-// PAGINATION
+  eventsOnaCalendar: any[] = [];
 
 // Created Hook
   created() {
-
+    
     fetch('https://varankin_dev.elma365.ru/api/extensions/2a38760e-083a-4dd0-aebc-78b570bfd3c7/script/users?limit=7')
       .then(response => response.json())
       .then(data => {
@@ -310,45 +153,135 @@ export default class Calendar extends Vue {
 
         this.backlog = this.tasks.filter((el: any) => {
           var backlogArr = [];
-
           if (el.executor == null) {
-
             return backlogArr.push(el);
-
           }
-
         });
 
         this.signedTasks = this.tasks = this.tasks.filter((el: any) => {
           var signedTasks = [];
-
           if (el.executor) {
             return signedTasks.push(el);
           }
         })
+
+        for (let i = 0; i < this.paginatedData().length; i++) {
+          const element = this.paginatedData()[i];
+          this.signedTasks.forEach((event: any) => {
+            if(event.planStartDate == element.date) {
+              event["weekDay"] = i + 1;
+              this.eventsOnaCalendar = [];
+              this.eventsOnaCalendar.push(event);
+            }
+          });
+        }
         this.filteredBacklog = this.backlog;
 
       })
       
   }
+  forceRender() {
+    this.$forceUpdate;
+  }
+
+  addTask(task: any) {
+    const event = task;
+    for (let i = 0; i < this.paginatedData().length; i++) {
+      const element = this.paginatedData()[i];
+      if(event.planStartDate == element.date) {
+        event["weekDay"] = i + 1;
+        event.executor = 0;
+        this.eventsOnaCalendar = [];
+        this.eventsOnaCalendar.push(event);
+        console.log(this.events);
+      }
+    }
+    this.reRenderGrid();
+  }
+
+// PAGINATION
+  nextPage() {
+    this.pageNumber++;
+    this.reRenderGrid();
+  }
+
+  prevPage() {
+    this.pageNumber--;
+    this.reRenderGrid();
+  }
+
+  clearArray(array: any) {
+    array;
+    return array = [];
+  }
+
+  reRenderGrid() {
+    this.eventsOnaCalendar = this.clearArray(this.signedTasks);
+    for (let i = 0; i < this.paginatedData().length; i++) {
+      const element = this.paginatedData()[i];
+      this.signedTasks.forEach((event: any) => {
+        console.log('SADSAJHDSALHBDSAKJD');
+        if(event.planStartDate == element.date) {
+          event["weekDay"] = i + 1;
+          this.eventsOnaCalendar = [];
+          this.eventsOnaCalendar.push(event);
+        }
+      });
+    }
+  }
+
+  pageCount() {
+    let length = this.listData.length;
+    let size = this.size;
+    return Math.ceil(length/size);
+  }
+
+  paginatedData() {
+    const start = this.pageNumber * this.size,
+    end = start + this.size;
+    return this.listData.slice(start, end);
+  }
+
+  realtiveCoords(event: any) {
+    console.log("event: ", event)
+    var element = document.querySelector('.event-container');
+    var bounds = element?.getBoundingClientRect();
+      var x = event.clientX - bounds!.left;
+      var y = event.clientY - bounds!.top;
+      var row = 1;
+      var column = 1;
+      for (let i = 0; i < this.users.length; i++) {
+        const element = this.users[i];
+        if (i == 0 && y >= 0 && y <= 100) {
+          row = 1;
+        } else if (y >= (100 * i) + 1 && y <= 100 * (i + 1)) {
+          row = i + 1;
+        }
+      }
+      console.log('eventX: ', x, 'eventY: ', y);
+      console.log('row: ', row, 'column: ', column);
+  }
 
   // Mounted Hook
   mounted() {
-
+    setTimeout(() => {
+      var container = document.querySelector('.event-container');
+      console.log(
+        'div width: ', container!.getBoundingClientRect().width,
+        'div height: ', container!.getBoundingClientRect().height,
+      );
+    }, 3000);
+    
     const tasksListElement = document.querySelector(`.backlog-card-list`);
     const taskElements = tasksListElement!.querySelectorAll(`.backlog-card`);
-
     tasksListElement!.addEventListener(`dragstart`, (evt: any) => {
       evt.target.classList.add(`selected`);
     })
-
     tasksListElement!.addEventListener(`dragend`, (evt: any) => {
       evt.target.classList.remove(`selected`);
     });
-
     tasksListElement!.addEventListener(`dragover`, (evt: any) => {
       evt.preventDefault();
-
       const activeElement = tasksListElement!.querySelector(`.selected`);
       const currentElement = evt.target;
       const isMoveable = activeElement !== currentElement &&
@@ -361,24 +294,20 @@ export default class Calendar extends Vue {
       const nextElement = (currentElement === activeElement!.nextElementSibling) ?
           currentElement.nextElementSibling :
           currentElement;
-
       tasksListElement!.insertBefore(activeElement!, nextElement);
     });
 
     const getNextElement = (cursorPosition: any, currentElement: any) => {
       const currentElementCoord = currentElement.getBoundingClientRect();
       const currentElementCenter = currentElementCoord.y + currentElementCoord.height / 2;
-
       const nextElement = (cursorPosition < currentElementCenter) ?
           currentElement :
           currentElement.nextElementSibling;
-
       return nextElement;
     };
 
     tasksListElement!.addEventListener(`dragover`, (evt: any) => {
       evt.preventDefault();
-
       const activeElement = tasksListElement!.querySelector(`.selected`);
       const currentElement = evt.target;
       const isMoveable = activeElement !== currentElement && currentElement!.classList.contains(`backlog-card`);
@@ -396,20 +325,15 @@ export default class Calendar extends Vue {
       ) {
         return;
       }
-
       tasksListElement!.insertBefore(activeElement!, nextElement);
     });
   }
 
   backlogSearch() {
     if (this.searchField !== '') {
-
       this.filteredBacklog = this.backlog.filter((el: any) => el.subject.toLowerCase() == this.searchField.toLowerCase());
-
     } else {
-
       this.filteredBacklog = this.backlog;
-
     }
   }
 
@@ -467,7 +391,7 @@ ul {
 }
 
 .timeslots li {
-  min-height: 100px;
+  height: 100px;
   width: 100%;
   background-color: rgb(92, 184, 92);
   color: #fff;
@@ -505,9 +429,8 @@ ul {
 
 .slot-1 {
   height: 33.3px;
-
-  grid-row: 4;
-  grid-column: 1;
+  
+  grid-area: 16 / 6 / auto / auto;
 }
 
 .selected {
