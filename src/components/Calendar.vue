@@ -5,7 +5,7 @@
 
       <div class="d-flex justify-content-between mb-3">
         <button @click="prevPage" :disabled="pageNumber == 0" class="btn btn-success">Prev</button>
-        <button @click="forceRender" class="btn btn-danger">Force Render</button>
+        <button @click="addOneTestTask" class="btn btn-danger">Force Render</button>
         <button @click="nextPage" :disabled="pageNumber >= pageCount()-1" class="btn btn-success">Next</button>
       </div>
 
@@ -29,15 +29,14 @@
           </ul>
         </div>
 
-        <div class="event-container" @click="realtiveCoords">
-            <div v-for="event in eventsOnaCalendar" :key="event.i" class="event-slot slot-1" :style="{ 'grid-column': event.weekDay, 'grid-row': (1 + (event.executor * 3)) }">
-              <div class="event-status" :title="event.subject">{{ event.planStartDate + event.subject }}</div>
-              <!-- <span>{{ event.subject }}</span> -->
+        <div class="event-container" 
+          @click="realtiveCoords"
+          @drop="onDrop($event)"
+          @dragenter.prevent
+          @dragover.prevent>
+            <div v-for="event in eventsOnaCalendar" :key="event.i" class="event-slot slot-1" :style="{ 'grid-column': event.weekDay, 'grid-row': event.executor }">
+              <div :style="{ 'width': dayNumberWidth + 'px' }" class="event-status">{{ event.subject }}</div>
             </div>
-          <div class="event-slot slot-1">
-            <div class="event-status"></div>
-            <span>Event A</span>
-          </div>
         </div>
 
       </div>
@@ -49,16 +48,31 @@
 
     <div class="backlog col-sm-4 p-1 bg-grey sticky-top">
       <h1>Backlog</h1>
-      <input class="w-100" @input="backlogSearch" v-model="searchField" type="search" placeholder="Поиск">
+      <input 
+        class="w-100" 
+        @input="backlogSearch" 
+        v-model="searchField" 
+        type="search" 
+        placeholder="Поиск">
       <div class="backlog-card-list">
-        <div class="backlog-card card my-1 text-start" v-for="task in filteredBacklog" :key="task.i" draggable="true">
-          <div @click="addTask(task)" class="card-header color-blue fw-bold">
+        <div 
+          v-for="task in filteredBacklog"
+          :key="task.i" 
+          @click="addTask(task)"
+          draggable="true" 
+          @dragstart="startDrag($event, task)" 
+          title="Задержите мышь, и перетащите на поле календаря"
+          class="backlog-card card my-1 text-start custom-title__2">
+
+          <div class="card-header color-blue fw-bold">
             {{ task.subject }}  
           </div>
+
           <div class="card-body">
             <p>
               {{ task.description ? task.description : 'Task description should be here' }}
             </p>
+
           </div>
         </div>
       </div>
@@ -71,6 +85,8 @@ import { Options, Vue } from 'vue-class-component';
 
 import Task from '@/Models/Task';
 import User from '@/Models/User';
+import DateList from '@/Models/DateList';
+import { watchEffect } from '@vue/runtime-core';
 
 @Options({
   props: {
@@ -95,21 +111,23 @@ export default class Calendar extends Vue {
         required:false,
         default: 7
       },
-      superevent: [],
-      eventsOnaCalendar: []
+      eventsOnaCalendar: [],
+      dayNumberWidth: 112.23,
+      row: 1,
+      column: 1,
     }
   }
-  superevent: any;
 
   users: User[] = [];
   tasks: Task[] = [];
-  backlog: Task[] = [];
+  backlog: any[] = [];
   signedTasks: Task[] = [];
   filteredBacklog: Task[] = [];
   searchField: string = '';
+  dayNumberWidth: number = 112.23;
 
   pageNumber: number = 0;
-  listData: any[] = [
+  listData: DateList[] = [
     { date: "2021-10-16" },
     { date: "2021-10-17" },
     { date: "2021-10-18" },
@@ -126,21 +144,43 @@ export default class Calendar extends Vue {
     { date: "2021-10-29" },
     { date: "2021-10-30" },
     { date: "2021-10-31" },
+    { date: "2021-11-01" },
+    { date: "2021-11-02" },
+    { date: "2021-11-03" },
+    { date: "2021-11-04" },
+    { date: "2021-11-05" },
+    { date: "2021-11-06" },
+    { date: "2021-11-07" },
+    { date: "2021-11-08" },
+    { date: "2021-11-09" },
+    { date: "2021-11-10" },
+    { date: "2021-11-11" },
+    { date: "2021-11-12" },
+    { date: "2021-11-13" },
+    { date: "2021-11-14" },
+    { date: "2021-11-15" },
   ];
   size: number = 7;
   renderComponent: any;
+  row: number = 1;
+  column: number = 1;
 
-  events: any[] = [];
+  events: Task[] = [];
   eventsByDay: any = {};
   daysInaWeek: number = 7;
   sections: number = this.daysInaWeek;
 
-  eventsOnaCalendar: any[] = [];
+  eventsOnaCalendar: Task[] = [];
 
 // Created Hook
   created() {
+    setInterval(() => {
+      this.dayNumberWidth = document.querySelector('.daynumbers li')!.getBoundingClientRect().width;
+    }, 100)
+
+    watchEffect(() => this.dayNumberWidth);
     
-    fetch('https://varankin_dev.elma365.ru/api/extensions/2a38760e-083a-4dd0-aebc-78b570bfd3c7/script/users?limit=7')
+    fetch('https://varankin_dev.elma365.ru/api/extensions/2a38760e-083a-4dd0-aebc-78b570bfd3c7/script/users')
       .then(response => response.json())
       .then(data => {
         this.users = data;
@@ -158,19 +198,28 @@ export default class Calendar extends Vue {
           }
         });
 
-        this.signedTasks = this.tasks = this.tasks.filter((el: any) => {
-          var signedTasks = [];
-          if (el.executor) {
-            return signedTasks.push(el);
-          }
-        })
+        // this.signedTasks = this.tasks = this.tasks.filter((el: any) => {
+        //   var signedTasks = [];
+        //   if (el.executor) {
+        //     el.executor*3;
+        //     return signedTasks.push(el);
+        //   }
+        // })
 
+        this.tasks.forEach((task: any) => {
+          if (task.executor) {
+            let executor = task.executor*3;
+            task.executor = executor;
+            this.signedTasks.push(task);
+          }
+        });
+        console.log(this.signedTasks);
         for (let i = 0; i < this.paginatedData().length; i++) {
           const element = this.paginatedData()[i];
           this.signedTasks.forEach((event: any) => {
             if(event.planStartDate == element.date) {
               event["weekDay"] = i + 1;
-              this.eventsOnaCalendar = [];
+              event["width"] = this.dayNumberWidth;
               this.eventsOnaCalendar.push(event);
             }
           });
@@ -184,17 +233,26 @@ export default class Calendar extends Vue {
     this.$forceUpdate;
   }
 
+  addOneTestTask() {
+    var task = this.backlog[9];
+
+    for (let i = 0; i < this.paginatedData().length; i++) {
+      const element = this.paginatedData()[i];
+        task["weekDay"] = i + 1;
+        task["executor"] = 1;
+        task.planStartDate = '2021-11-04';
+        this.signedTasks.push(task);
+    }
+    this.reRenderGrid();
+  }
+
   addTask(task: any) {
     const event = task;
     for (let i = 0; i < this.paginatedData().length; i++) {
       const element = this.paginatedData()[i];
-      if(event.planStartDate == element.date) {
         event["weekDay"] = i + 1;
-        event.executor = 0;
-        this.eventsOnaCalendar = [];
-        this.eventsOnaCalendar.push(event);
-        console.log(this.events);
-      }
+        event.executor = this.row;
+        this.signedTasks.push(event);
     }
     this.reRenderGrid();
   }
@@ -220,10 +278,8 @@ export default class Calendar extends Vue {
     for (let i = 0; i < this.paginatedData().length; i++) {
       const element = this.paginatedData()[i];
       this.signedTasks.forEach((event: any) => {
-        console.log('SADSAJHDSALHBDSAKJD');
         if(event.planStartDate == element.date) {
           event["weekDay"] = i + 1;
-          this.eventsOnaCalendar = [];
           this.eventsOnaCalendar.push(event);
         }
       });
@@ -243,90 +299,71 @@ export default class Calendar extends Vue {
   }
 
   realtiveCoords(event: any) {
-    console.log("event: ", event)
     var element = document.querySelector('.event-container');
     var bounds = element?.getBoundingClientRect();
-      var x = event.clientX - bounds!.left;
-      var y = event.clientY - bounds!.top;
-      var row = 1;
-      var column = 1;
-      for (let i = 0; i < this.users.length; i++) {
-        const element = this.users[i];
-        if (i == 0 && y >= 0 && y <= 100) {
-          row = 1;
-        } else if (y >= (100 * i) + 1 && y <= 100 * (i + 1)) {
-          row = i + 1;
-        }
+    var x = event.clientX - bounds!.left;
+    var y = event.clientY - bounds!.top;
+    this.row = 1;
+    this.column = 1;
+    for (let i = 0; i < this.users.length*3; i++) {
+      const element = this.users[i];
+      if (i == 0 && y >= 0 && y <= 33.333) {
+        this.row = 1;
+      } else if (i == 1 && y >= 33.334 && y <= 66.666) {
+        this.row = 2;
+      } else if (i == 2 && y >= 66.667 && y <= 100) {
+        this.row = 3;
+      } else if (y >= (100/3 * i) + 1 && y <= 100/3 * (i + 1)) {
+        this.row = i + 1;
       }
-      console.log('eventX: ', x, 'eventY: ', y);
-      console.log('row: ', row, 'column: ', column);
+    }
+
+    var container = document.querySelector('.event-container');
+    this.dayNumberWidth = document.querySelector('.daynumbers li')!.getBoundingClientRect().width;
+
+    for (let i = 0; i < 7; i++) {
+      if (i == 0 && x >= 0 && x <= this.dayNumberWidth) {
+        this.column = 1;
+      } else if ( x >= (this.dayNumberWidth * i) + 1 && this.dayNumberWidth * (i + 1)) {
+        this.column = i + 1;
+      }
+    }
+    console.log('row: ', this.row, 'column: ', this.column);
   }
 
   // Mounted Hook
   mounted() {
-    setTimeout(() => {
-      var container = document.querySelector('.event-container');
-      console.log(
-        'div width: ', container!.getBoundingClientRect().width,
-        'div height: ', container!.getBoundingClientRect().height,
-      );
-    }, 3000);
     
-    const tasksListElement = document.querySelector(`.backlog-card-list`);
-    const taskElements = tasksListElement!.querySelectorAll(`.backlog-card`);
-    tasksListElement!.addEventListener(`dragstart`, (evt: any) => {
-      evt.target.classList.add(`selected`);
-    })
-    tasksListElement!.addEventListener(`dragend`, (evt: any) => {
-      evt.target.classList.remove(`selected`);
-    });
-    tasksListElement!.addEventListener(`dragover`, (evt: any) => {
-      evt.preventDefault();
-      const activeElement = tasksListElement!.querySelector(`.selected`);
-      const currentElement = evt.target;
-      const isMoveable = activeElement !== currentElement &&
-        currentElement.classList.contains(`.backlog-card`);
+  }
 
-      if (!isMoveable) {
-        return;
-      }
+  startDrag(event: any, item: any) {
+    console.log(item);
+    event.dataTransfer.dropEffect = 'move';
+    event.dataTransfer.effectAllowed = 'move';
+    event.dataTransfer.setData('itemID', item.id);
+  }
 
-      const nextElement = (currentElement === activeElement!.nextElementSibling) ?
-          currentElement.nextElementSibling :
-          currentElement;
-      tasksListElement!.insertBefore(activeElement!, nextElement);
-    });
+  onDrop(event: any, list?: any) {
+    const itemID = event.dataTransfer.getData('itemID');
+    const item = this.backlog.find((item: any) => item.id == itemID);
+    this.realtiveCoords(event);
+    
+    let weekDay = this.paginatedData()[this.column-1].date;
+    console.log('weekDay: ', weekDay);
+    item.planStartDate = weekDay;
+    item["weekDay"] = this.column;
+    item.executor = this.row - 3;
+    this.signedTasks.push(item);
+    
+    this.reRenderGrid();
 
-    const getNextElement = (cursorPosition: any, currentElement: any) => {
-      const currentElementCoord = currentElement.getBoundingClientRect();
-      const currentElementCenter = currentElementCoord.y + currentElementCoord.height / 2;
-      const nextElement = (cursorPosition < currentElementCenter) ?
-          currentElement :
-          currentElement.nextElementSibling;
-      return nextElement;
-    };
+    this.addTask(item);
 
-    tasksListElement!.addEventListener(`dragover`, (evt: any) => {
-      evt.preventDefault();
-      const activeElement = tasksListElement!.querySelector(`.selected`);
-      const currentElement = evt.target;
-      const isMoveable = activeElement !== currentElement && currentElement!.classList.contains(`backlog-card`);
-
-      if (!isMoveable) {
-        return;
-      }
-
-      const nextElement = getNextElement(evt.clientY, currentElement);
-
-      if (
-        nextElement && 
-        activeElement === nextElement.previousElementSibling ||
-        activeElement === nextElement
-      ) {
-        return;
-      }
-      tasksListElement!.insertBefore(activeElement!, nextElement);
-    });
+    const index = this.backlog.indexOf(item);
+    console.log(index);
+    if (index > -1) {
+      this.backlog.splice(index, 1);
+    }
   }
 
   backlogSearch() {
@@ -342,165 +379,6 @@ export default class Calendar extends Vue {
 
 <style scoped>
 
-li {
-  list-style: none;
-}
-
-ul {
-  margin: 0;
-  padding: 0;
-}
-
-.calendar-container {
-  display: grid;
-  grid-template-columns: 150px auto;
-  grid-template-rows: auto;
-  gap: 1px 1px;
-  grid-template-areas: ". calendar-header" "timeslots-container main";
-}
-
-.daynumbers {
-  display: grid;
-  text-align: left;
-  grid-template-columns: repeat(7, 1fr);
-  min-height: 2em;
-}
-
-.daynumbers li {
-  border: 2px solid #ccc;
-  text-align: center;
-  border-radius: 5px 5px 0 0;
-}
-
-.calendar-header {
-  /* background-color: gray; */
-  grid-area: calendar-header;
-}
-
-.timeslots-container {
-  background-color: lightgray;
-  grid-area: timeslots-container;
-  justify-content: left;
-}
-
-.timeslots {
-  min-width: 150px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-}
-
-.timeslots li {
-  height: 100px;
-  width: 100%;
-  background-color: rgb(92, 184, 92);
-  color: #fff;
-  font-weight: 500;
-  line-height: 100px;
-}
-
-.timeslots li::after {
-  content: "";
-  position: absolute;
-  left: 10px;
-  width: 65%;
-  height: 1px;
-  background-color: lightgray;
-  z-index: 1;
-}
-
-.event-container {
-  display: grid;
-  grid-template-columns: repeat(7, 1fr);
-  grid-template-rows: repeat(21, 1fr);
-  grid-area: main;
-  position: relative;
-}
-
-.event-slot {
-  position: absolute;
-  background-color: darkslategray;
-  border-radius: 5px;
-  z-index: 5;
-  color: white;
-  font-size: 12px;
-  line-height: 33px;
-}
-
-.slot-1 {
-  height: 33.3px;
-  
-  grid-area: 16 / 6 / auto / auto;
-}
-
-.selected {
-  opacity: 0.6;
-}
-
-.task-table {
-  overflow-y: scroll;
-  overflow-x: scroll;
-  height:750px;
-}
-
-.backlog {
-  overflow-y: scroll;
-  max-height: 800px;
-}
-
-.bg-grey {
-  background-color: lightgrey;
-}
-
-.color-blue {
-  color: darkcyan;
-}
-
-.color-white {
-  color: white;
-}
-
-.bg-green {
-  background-color: green;
-}
-
-.div-table {
-  display: table;             
-  border: 1px solid #666666;         
-  border-spacing: 5px; /* cellspacing:poor IE support for  this */
-}
-.div-table-row {
-  display: table-row;
-  width: auto;
-  border: 1px solid #666666;
-}
-.div-table-col {
-  float: left; /* fix for  buggy browsers */
-  display: table-column;         
-  width: 150px;
-  height: 150px;
-  line-height: 150px;
-  border: 1px solid #666666;
-}
-
-@media (max-width: 1023px) {
-  .backlog {
-    display: none;
-  }
-
-  .div-table {
-    width: 100% !important;
-  }
-  
-  .timeslots li::after {
-    content: "";
-    position: absolute;
-    left: 10px;
-    width: 100%;
-    height: 1px;
-    background-color: lightgray;
-    z-index: 1;
-  }
-}
+  @import url('./Calendar.css');
 
 </style>
