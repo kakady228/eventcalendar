@@ -1,11 +1,10 @@
 <template>
   <div class="d-flex py-1">
 
-    <div class="div-table col-sm-8">
+    <div class="div-table col-sm-12 col-md-8">
 
       <div class="d-flex justify-content-between mb-3">
         <button @click="prevPage" :disabled="pageNumber == 0" class="btn btn-success">Prev</button>
-        <button @click="addOneTestTask" class="btn btn-danger">Force Render</button>
         <button @click="nextPage" :disabled="pageNumber >= pageCount()-1" class="btn btn-success">Next</button>
       </div>
 
@@ -21,20 +20,29 @@
           </ul>
         </div>
 
-        <div class="timeslots-container">
-          <ul class="timeslots">
-            <li v-for="user in users" :key="user.i">
-              {{ user.firstName + ' ' + user.surname }}  
+        <div class="users-container">
+          <ul class="users">
+            <li 
+              v-for="user in users" 
+              :key="user.i"
+              :style="{ '--gridWidth': gridWidth + 'px' }"
+              @drop="onDrop($event)"
+              @dragenter.prevent
+              @dragover.prevent>
+                {{ user.username }}  
             </li>
           </ul>
         </div>
 
-        <div class="event-container" 
-          @click="realtiveCoords"
+        <div class="event-container"
           @drop="onDrop($event)"
           @dragenter.prevent
           @dragover.prevent>
-            <div v-for="event in eventsOnaCalendar" :key="event.i" class="event-slot slot-1" :style="{ 'grid-column': event.weekDay, 'grid-row': event.executor }">
+            <div 
+              v-for="event in eventsOnaCalendar" 
+              :key="event.i" :title="event.subject" 
+              class="event-slot slot-1" 
+              :style="{ 'grid-column': event.weekDay, 'grid-row': event.executor }">
               <div :style="{ 'width': dayNumberWidth + 'px' }" class="event-status">{{ event.subject }}</div>
             </div>
         </div>
@@ -113,6 +121,7 @@ export default class Calendar extends Vue {
       },
       eventsOnaCalendar: [],
       dayNumberWidth: 112.23,
+      gridWidth: 0,
       row: 1,
       column: 1,
     }
@@ -120,11 +129,12 @@ export default class Calendar extends Vue {
 
   users: User[] = [];
   tasks: Task[] = [];
-  backlog: any[] = [];
+  backlog: Task[] = [];
   signedTasks: Task[] = [];
   filteredBacklog: Task[] = [];
   searchField: string = '';
   dayNumberWidth: number = 112.23;
+  gridWidth: number = 0;
 
   pageNumber: number = 0;
   listData: DateList[] = [
@@ -159,14 +169,16 @@ export default class Calendar extends Vue {
     { date: "2021-11-13" },
     { date: "2021-11-14" },
     { date: "2021-11-15" },
+    { date: "2021-11-16" },
+    { date: "2021-11-17" },
+    { date: "2021-11-18" },
+    { date: "2021-11-19" },
   ];
   size: number = 7;
-  renderComponent: any;
   row: number = 1;
   column: number = 1;
 
   events: Task[] = [];
-  eventsByDay: any = {};
   daysInaWeek: number = 7;
   sections: number = this.daysInaWeek;
 
@@ -176,9 +188,11 @@ export default class Calendar extends Vue {
   created() {
     setInterval(() => {
       this.dayNumberWidth = document.querySelector('.daynumbers li')!.getBoundingClientRect().width;
+      this.gridWidth = document.querySelector('.calendar-container')!.getBoundingClientRect().width;
     }, 100)
 
     watchEffect(() => this.dayNumberWidth);
+    watchEffect(() => this.gridWidth);
     
     fetch('https://varankin_dev.elma365.ru/api/extensions/2a38760e-083a-4dd0-aebc-78b570bfd3c7/script/users')
       .then(response => response.json())
@@ -191,22 +205,14 @@ export default class Calendar extends Vue {
       .then(data => {
         this.tasks = data;
 
-        this.backlog = this.tasks.filter((el: any) => {
+        this.backlog = this.tasks.filter((el: Task) => {
           var backlogArr = [];
           if (el.executor == null) {
             return backlogArr.push(el);
           }
         });
 
-        // this.signedTasks = this.tasks = this.tasks.filter((el: any) => {
-        //   var signedTasks = [];
-        //   if (el.executor) {
-        //     el.executor*3;
-        //     return signedTasks.push(el);
-        //   }
-        // })
-
-        this.tasks.forEach((task: any) => {
+        this.tasks.forEach((task: Task) => {
           if (task.executor) {
             let executor = task.executor*3;
             task.executor = executor;
@@ -216,10 +222,9 @@ export default class Calendar extends Vue {
         console.log(this.signedTasks);
         for (let i = 0; i < this.paginatedData().length; i++) {
           const element = this.paginatedData()[i];
-          this.signedTasks.forEach((event: any) => {
+          this.signedTasks.forEach((event: Task) => {
             if(event.planStartDate == element.date) {
               event["weekDay"] = i + 1;
-              event["width"] = this.dayNumberWidth;
               this.eventsOnaCalendar.push(event);
             }
           });
@@ -228,9 +233,6 @@ export default class Calendar extends Vue {
 
       })
       
-  }
-  forceRender() {
-    this.$forceUpdate;
   }
 
   addOneTestTask() {
@@ -246,7 +248,7 @@ export default class Calendar extends Vue {
     this.reRenderGrid();
   }
 
-  addTask(task: any) {
+  addTask(task: Task) {
     const event = task;
     for (let i = 0; i < this.paginatedData().length; i++) {
       const element = this.paginatedData()[i];
@@ -277,7 +279,7 @@ export default class Calendar extends Vue {
     this.eventsOnaCalendar = this.clearArray(this.signedTasks);
     for (let i = 0; i < this.paginatedData().length; i++) {
       const element = this.paginatedData()[i];
-      this.signedTasks.forEach((event: any) => {
+      this.signedTasks.forEach((event: Task) => {
         if(event.planStartDate == element.date) {
           event["weekDay"] = i + 1;
           this.eventsOnaCalendar.push(event);
@@ -336,29 +338,57 @@ export default class Calendar extends Vue {
     
   }
 
-  startDrag(event: any, item: any) {
+  startDrag(event: any, item: Task) {
     console.log(item);
     event.dataTransfer.dropEffect = 'move';
     event.dataTransfer.effectAllowed = 'move';
     event.dataTransfer.setData('itemID', item.id);
   }
 
-  onDrop(event: any, list?: any) {
+  onDrop(event: any) {
     const itemID = event.dataTransfer.getData('itemID');
-    const item = this.backlog.find((item: any) => item.id == itemID);
+    const item = this.backlog.find((item: Task) => item.id == itemID);
     this.realtiveCoords(event);
     
     let weekDay = this.paginatedData()[this.column-1].date;
     console.log('weekDay: ', weekDay);
-    item.planStartDate = weekDay;
-    item["weekDay"] = this.column;
-    item.executor = this.row - 3;
-    this.signedTasks.push(item);
+    item!.planStartDate = weekDay;
+    item!["weekDay"] = this.column;
+    item!.executor = this.row - 3;
+    this.signedTasks.push(item!);
     
     this.reRenderGrid();
 
-    this.addTask(item);
+    this.addTask(item!);
 
+    this.deleteEventBacklog(item!);
+  }
+
+  onDropUser(event: any) {
+    const itemID = event.dataTransfer.getData('itemID');
+    const item = this.backlog.find((item: Task) => item.id == itemID);
+    this.realtiveCoords(event);
+
+    item!.planStartDate = '2021-10-16';
+    item!.executor = this.row - 3;
+
+    for (let i = 0; i < this.paginatedData().length; i++) {
+      const date = this.paginatedData()[i];
+      if (item!.planStartDate == date.date) {
+        item!['weekDay'] = i + 1;
+      }
+    }
+    this.signedTasks.push(item!);
+
+    this.reRenderGrid();
+
+    this.addTask(item!);
+
+    this.deleteEventBacklog(item!);
+
+  }
+
+  deleteEventBacklog(item: Task) {
     const index = this.backlog.indexOf(item);
     console.log(index);
     if (index > -1) {
@@ -368,7 +398,7 @@ export default class Calendar extends Vue {
 
   backlogSearch() {
     if (this.searchField !== '') {
-      this.filteredBacklog = this.backlog.filter((el: any) => el.subject.toLowerCase() == this.searchField.toLowerCase());
+      this.filteredBacklog = this.backlog.filter((el: Task) => el.subject!.toLowerCase() == this.searchField.toLowerCase());
     } else {
       this.filteredBacklog = this.backlog;
     }
